@@ -1,27 +1,52 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <cstring>
 #include <fstream>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <unistd.h>
+#include <arpa/inet.h> // inet_addr()
+#include <netdb.h> //struct hostent, gethostbyname
 
 using namespace std;
+int sock;
+void error(const char *msg) {perror(msg); exit(0); }
+
+void snd(const char *msg) {
+  if (send(sock, msg, strlen(msg), 0) == -1)
+    error("Could not send message to server");
+}
 
 int main (int argc, char * argv[]) {
-  if (argc != 3) //bad number of parameters
-  {
-    printf("Correct usage: ./myftp <server address> <port number>\n");
-    exit(0);
-  }
+  if (argc != 3) error("Correct usage: ./myftp <server address> <port number>");
   
-  printf("Attempting connection to: %s at port %s\n\n", argv[1], argv[2]);
+  string addr = argv[1];
+  int port = stoi(argv[2]);
   
-  //TODO: socket connection to server w/ appropriate error checking
+  sock = socket(AF_INET, SOCK_STREAM, 0);
+  if (sock == -1) error("Socket creation failed.\n");
   
-  while(1) { //user control loop
+  sockaddr_in serverAddress;
+  serverAddress.sin_family = AF_INET;
+  serverAddress.sin_port = htons(port);
+  if (addr == "self")
+    serverAddress.sin_addr.s_addr = INADDR_ANY;
+  else
+    serverAddress.sin_addr.s_addr = inet_addr(argv[1]);
+  
+  if (connect(sock, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) != 0)
+    error("Could not connect to server");
+    
+  cout << "Connection to server established" << endl;
+  
+  int running = 1;
+  while(running) { //user control loop
     string cmdline;
     string cmd, tmp;
     string arg = "";
     
-    printf("myftp> ");
+    cout << "myftp> ";
     getline(cin, cmdline);
     stringstream ss(cmdline);
     ss >> cmd >> arg;
@@ -32,6 +57,8 @@ int main (int argc, char * argv[]) {
       } else {
         cout << "Downloading file " << arg;
         //TODO: implement
+        snd(cmdline.c_str());
+        
         ofstream getFile(arg);
         getFile << "Test get file" << endl;
         getFile.close();
@@ -44,14 +71,15 @@ int main (int argc, char * argv[]) {
         cout << "Uploading file " << arg;
         
         ifstream putFile(arg);
-        //inFile.open(argv[1]);
         if(putFile.fail()) {
           cout << endl << "File could not be opened. Make sure the file name is correct.";
         } else {
           cout << endl << "File contents: " << putFile.rdbuf();
         }
         putFile.close();
+        
         //TODO: implement
+        snd(cmdline.c_str());
       }
     
     } else if (cmd == "delete") {
@@ -60,6 +88,7 @@ int main (int argc, char * argv[]) {
       } else {
         cout << "Deleting file " << arg;
         //TODO: implement
+        snd(cmdline.c_str());
       }
     
     } else if (cmd == "cd") {
@@ -68,6 +97,7 @@ int main (int argc, char * argv[]) {
       } else {
         cout << "Moving to " << arg;
         //TODO: implement
+        snd(cmdline.c_str());
       }
     
     } else if (cmd == "mkdir") {
@@ -76,18 +106,25 @@ int main (int argc, char * argv[]) {
       } else {
         cout << "Making directory " << arg;
         //TODO: implement
+        snd(cmdline.c_str());
       }
     
     } else if (cmd == "ls") {
       cout << "Files in this directory: ";
       //TODO: implement
+      snd("ls");
     } else if (cmd == "pwd") {
       cout << "Current directory: ";
       //TODO: implement
+      snd("pwd");
     } else if (cmd == "quit") {
-      cout << "Program exiting..." << endl << endl;
-      //TODO: end connection and close socket
-      exit(1);
+      snd("quit");
+      cout << "Program exiting...";
+      running = 0;
+    } else if (cmd == "shutdown") { //used to close the server
+      snd("shutdown");
+      cout << "Exiting program and shutting down server...";
+      running = 0;
     } else {
       cout << "Unknown command";
     }
@@ -96,5 +133,6 @@ int main (int argc, char * argv[]) {
   
   }
   
+  close(sock);
   exit(1);
 }
