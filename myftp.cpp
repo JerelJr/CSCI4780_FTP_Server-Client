@@ -1,6 +1,6 @@
 #include <iostream>
 #include <sstream>
-#include <string>
+#include <cstring>
 #include <cstring>
 #include <fstream>
 #include <sys/socket.h>
@@ -12,6 +12,15 @@
 using namespace std;
 int sock;
 void error(const char *msg) {perror(msg); exit(0); }
+
+string rcv() {
+    char buffer[1024];
+    memset(buffer, 0, sizeof(buffer));
+    
+    recv(sock, buffer, sizeof(buffer), 0); //receive data from server
+    
+    return string(buffer);
+}
 
 void snd(const char *msg) {
   if (send(sock, msg, strlen(msg), 0) == -1)
@@ -58,8 +67,11 @@ int main (int argc, char * argv[]) {
         cout << "Downloading file " << arg;
         //TODO: implement
         snd(cmdline.c_str());
-        
+
+        string fileName = rcv();
+
         ofstream getFile(arg);
+        getFile.write(fileName.c_str(), fileName.size());
         getFile << "Test get file" << endl;
         getFile.close();
       }
