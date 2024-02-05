@@ -13,8 +13,10 @@ Use 'make' to compile both files, or 'make client' and 'make server' to compile 
 client and server files respectively.
 
 Usage:
+```
 ./myftpserver <port number>
 ./myftp <server address> <port number>
+```
 
 The port numbers must match for the client to connect. The server address can be found
 by running 'hostname -i' on the machine running the server. If the client and server
