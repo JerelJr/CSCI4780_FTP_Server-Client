@@ -88,6 +88,9 @@ int main (int argc, char * argv[]) {
           stringstream fileContent;
           fileContent << putFile.rdbuf();
           putFile.close();
+
+          string fileLength = to_string(fileContent.str().size());
+          snd(fileLength.c_str());
         
           //TODO: implement
           snd(fileContent.str().c_str());
