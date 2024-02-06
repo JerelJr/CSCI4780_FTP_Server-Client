@@ -14,12 +14,12 @@ int sock;
 void error(const char *msg) {perror(msg); exit(0); }
 
 string rcv() {
-    char buffer[1024];
-    memset(buffer, 0, sizeof(buffer));
+  char buffer[1024];
+  memset(buffer, 0, sizeof(buffer));
     
-    recv(sock, buffer, sizeof(buffer), 0); //receive data from server
+  recv(sock, buffer, sizeof(buffer), 0); //receive data from server
     
-    return string(buffer);
+  return string(buffer);
 }
 
 void snd(const char *msg) {
