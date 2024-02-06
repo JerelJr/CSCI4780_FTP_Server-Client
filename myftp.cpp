@@ -17,7 +17,9 @@ string rcv() {
   char buffer[1024];
   memset(buffer, 0, sizeof(buffer));
     
-  recv(sock, buffer, sizeof(buffer), 0); //receive data from server
+  int size = recv(sock, buffer, sizeof(buffer), 0); //receive data from server
+  if (size < 0)
+    error("Error receiving data from server");
     
   return string(buffer);
 }
@@ -66,13 +68,19 @@ int main (int argc, char * argv[]) {
       } else {
         cout << "Downloading file " << arg;
         //TODO: implement
+
+        FILE *file = fopen(arg.c_str(), "wb");
+        
         snd(cmdline.c_str());
-
-        string fileName = rcv();
-
-        ofstream getFile(arg, ios::out | ios::binary);
-        getFile.write(fileName.c_str(), fileName.size());
-        getFile.close();
+        sleep(1);
+        char buffer[1024] = {0};
+        
+        size_t rec_len = -1;
+        while((rec_len = fread(buffer, 1, 1024, file)) > 0) {      
+          recv(sock, buffer, rec_len, 0);  
+          fwrite(buffer, 1, rec_len, file);
+        }
+        fclose(file);
       }
     
     } else if (cmd == "put") {
