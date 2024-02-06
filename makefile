@@ -1,4 +1,4 @@
-OPTS = -Wall -pedantic-errors
+OPTS = -Wall -pedantic-errors -std=c++11
 N1 = myftp
 N2 = myftpserver
 

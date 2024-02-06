@@ -72,7 +72,6 @@ int main (int argc, char * argv[]) {
 
         ofstream getFile(arg);
         getFile.write(fileName.c_str(), fileName.size());
-        getFile << "Test get file" << endl;
         getFile.close();
       }
     
@@ -82,16 +81,18 @@ int main (int argc, char * argv[]) {
       } else {
         cout << "Uploading file " << arg;
         
-        ifstream putFile(arg);
+        ifstream putFile(arg, ios::in | ios::binary);
         if(putFile.fail()) {
           cout << endl << "File could not be opened. Make sure the file name is correct.";
         } else {
-          cout << endl << "File contents: " << putFile.rdbuf();
-        }
-        putFile.close();
+          stringstream fileContent;
+          fileContent << putFile.rdbuf();
+          putFile.close();
         
-        //TODO: implement
-        snd(cmdline.c_str());
+          //TODO: implement
+          snd(fileContent.str().c_str());
+          cout << "File Uploaded";
+        }
       }
     
     } else if (cmd == "delete") {
