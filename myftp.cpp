@@ -1,27 +1,43 @@
 #include <iostream>
 #include <sstream>
+#include <string>
 #include <cstring>
-#include <cstring>
-#include <fstream>
-#include <sys/socket.h>
-#include <netinet/in.h>
+
 #include <unistd.h>
-#include <arpa/inet.h> // inet_addr()
+
+#include <sys/socket.h>
+#include <netinet/in.h> //IP addresses
+#include <arpa/inet.h> //inet_addr()
 #include <netdb.h> //struct hostent, gethostbyname
 
 using namespace std;
-int sock;
-void error(const char *msg) {perror(msg); exit(0); }
 
-string rcv() {
-  char buffer[1024];
-  memset(buffer, 0, sizeof(buffer));
+int sock;
+char buffer[1024];
+
+void error(const char *msg) {perror(msg); exit(0); }
+void zerobuf() {  memset(buffer, 0, sizeof(buffer));}
+
+int code(const char *msg) {
+  if (memcmp(msg, "ERR", 3) == 0) return -1;
+  if (memcmp(msg, "MSG", 3) == 0) return 1;
+  if (memcmp(msg, "FIL", 3) == 0) return 2;
+  return -2;
+}
+
+/**
+*
+* Normal reply messages are assumed to be less than 1024 characters
+*
+**/
+char* rcv() {
+  zerobuf();
     
   int size = recv(sock, buffer, sizeof(buffer), 0); //receive data from server
   if (size < 0)
     error("Error receiving data from server");
     
-  return string(buffer);
+  return buffer;
 }
 
 void snd(const char *msg) {
@@ -73,7 +89,7 @@ int main (int argc, char * argv[]) {
         
         snd(cmdline.c_str());
         sleep(1);
-        char buffer[1024] = {0};
+        zerobuf();
         
         size_t rec_len = -1;
         while((rec_len = recv(sock, buffer, sizeof(buffer), 0)) > 0) {
@@ -94,11 +110,11 @@ int main (int argc, char * argv[]) {
         } else {
           snd(cmdline.c_str());
           sleep(1);
-          char buffer[1024] = {0};
+          zerobuf();
           
           size_t rec_len = -1;
           while((rec_len = fread(buffer, 1, 1024, file)) > 0) {
-            send(sock, buffer, rec_len, 0);
+            snd(buffer);
           }
           
           cout << "File Uploaded";
@@ -110,38 +126,46 @@ int main (int argc, char * argv[]) {
       if (arg.empty()) {
         cout << "Invalid command. Usage: delete <remote_filename>";
       } else {
-        cout << "Deleting file " << arg;
         //TODO: implement
         snd(cmdline.c_str());
+        
+        char *reply = rcv();
+        cout << reply+4;
       }
     
     } else if (cmd == "cd") {
       if (arg.empty()) {
         cout << "Invalid command. Usage: cd <remote_directory_name>";
       } else {
-        cout << "Moving to " << arg;
         //TODO: implement
         snd(cmdline.c_str());
+        
+        char *reply = rcv();
+        cout << reply+4;
       }
     
     } else if (cmd == "mkdir") {
       if (arg.empty()) {
         cout << "Invalid command. Usage: mkdir <remote_directory_name>";
       } else {
-        cout << "Making directory " << arg;
         //TODO: implement
         snd(cmdline.c_str());
+        
+        char *reply = rcv();
+        cout << reply+4;
       }
     
     } else if (cmd == "ls") {
-      cout << "Files in this directory: ";
-      //TODO: implement
       snd("ls");
+      
+      char *reply = rcv();
+      cout << reply;
     } else if (cmd == "pwd") {
-      cout << "Current directory: ";
-      //TODO: implement
       snd("pwd");
-    } else if (cmd == "quit") {
+      
+      char *reply = rcv();
+      cout << reply;
+    } else if (cmd == "quit" || cmd == "exit") {
       snd("quit");
       cout << "Program exiting...";
       running = 0;
