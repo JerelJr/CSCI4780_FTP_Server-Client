@@ -84,7 +84,6 @@ int handleClient(int sock)
         {
           std::cerr << "Error receiving file" << std::endl;
         }
-        std::cerr << size_recvd << " bytes read" << std::endl;
 
         file.close();
       }
