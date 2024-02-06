@@ -81,17 +81,21 @@ int main (int argc, char * argv[]) {
       } else {
         cout << "Uploading file " << arg;
         
-        ifstream putFile(arg, ios::in | ios::binary);
-        if(putFile.fail()) {
+        FILE *file = fopen(arg.c_str(), "rb");
+        if(0){
           cout << endl << "File could not be opened. Make sure the file name is correct.";
         } else {
-          stringstream fileContent;
-          fileContent << putFile.rdbuf();
-          putFile.close();
-        
-          //TODO: implement
-          snd(fileContent.str().c_str());
+          snd(cmdline.c_str());
+          sleep(1);
+          char buffer[1024] = {0};
+          
+          size_t rec_len = -1;
+          while((rec_len = fread(buffer, 1, 1024, file)) > 0) {
+            send(sock, buffer, rec_len, 0);
+          }
+          
           cout << "File Uploaded";
+          fclose(file);
         }
       }
     
