@@ -85,6 +85,7 @@ int main (int argc, char * argv[]) {
         if(0){
           cout << endl << "File could not be opened. Make sure the file name is correct.";
         } else {
+          snd(cmdline.c_str());
           
           char buffer[1024] = {0};
           
