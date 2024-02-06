@@ -70,7 +70,7 @@ int main (int argc, char * argv[]) {
 
         string fileName = rcv();
 
-        ofstream getFile(arg);
+        ofstream getFile(arg, ios::out | ios::binary);
         getFile.write(fileName.c_str(), fileName.size());
         getFile.close();
       }
