@@ -76,10 +76,15 @@ int handleClient(int sock)
         bzero(buffer, sizeof(buffer));
         size_t size_recvd;
 
-        while ((size_recvd = recv(sock, buffer, sizeof(buffer), 0)))
+        while ((size_recvd = recv(sock, buffer, sizeof(buffer), 0)) > 0)
         {
           file.write(buffer, size_recvd);
         }
+        if (size_recvd < 0)
+        {
+          std::cerr << "Error receiving file" << std::endl;
+        }
+        std::cerr << size_recvd << " bytes read" << std::endl;
 
         file.close();
       }
