@@ -76,8 +76,7 @@ int main (int argc, char * argv[]) {
         char buffer[1024] = {0};
         
         size_t rec_len = -1;
-        while((rec_len = fread(buffer, 1, 1024, file)) > 0) {      
-          recv(sock, buffer, rec_len, 0);  
+        while((rec_len = recv(sock, buffer, sizeof(buffer), 0)) > 0) {
           fwrite(buffer, 1, rec_len, file);
         }
         fclose(file);
