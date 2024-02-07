@@ -10,7 +10,8 @@ state that we have not received unauthorized help of any form.
 
 Compiling:
 Use 'make' to compile both files, or 'make client' and 'make server' to compile the 
-client and server files respectively.
+client and server files respectively. The files must be compiled with the option
+'-std=c++17' to ensure that the compiler uses at least C++17. 
 
 Usage:
 ```
