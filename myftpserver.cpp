@@ -36,6 +36,9 @@ int handleClient(int sock, int tid) {
   int connected = 1;
   int shutdown = 0;
   
+  string terminationMessage = "MSG " + tid;
+  snd(sock, terminationMessage.c_str());
+  
   while (connected) {
     char buffer[1024] = {0};
     int ret = recv(sock, buffer, sizeof(buffer), 0);
