@@ -46,7 +46,7 @@ void snd(const char *msg) {
 }
 
 int main (int argc, char * argv[]) {
-  if (argc != 3) error("Correct usage: ./myftp <server address> <port number>");
+  if (argc != 4) error("Correct usage: ./myftp <server address> <port number> <terminate port number>");
   
   string addr = argv[1];
   int port = stoi(argv[2]);
@@ -162,12 +162,12 @@ int main (int argc, char * argv[]) {
       snd("ls");
       
       char *reply = rcv();
-      cout << reply;
+      cout << reply+4;
     } else if (cmd == "pwd") {
       snd("pwd");
       
       char *reply = rcv();
-      cout << reply;
+      cout << reply+4;
     } else if (cmd == "quit" || cmd == "exit") {
       snd("quit");
       cout << "Program exiting...";
