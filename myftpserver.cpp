@@ -16,6 +16,7 @@ using namespace std;
 int serving = 1;
 int taskList[100][2] = {0};
 int testing;
+int consoleSocket;
 
 default_random_engine generator;
 uniform_int_distribution<> distribution(100000,999999);
@@ -32,12 +33,8 @@ void fullClose(int sock) {
   close(sock);
 }
 
-int handleClient(int sock, int tid) {
+void handleClient(int sock, int tid) {
   int connected = 1;
-  int shutdown = 0;
-  
-  string terminationMessage = "MSG " + tid;
-  snd(sock, terminationMessage.c_str());
   
   while (connected) {
     char buffer[1024] = {0};
@@ -49,15 +46,21 @@ int handleClient(int sock, int tid) {
     
     if (ret == 0) //client disconnected
       break;
-    else if (ret == -1) error("Socket read failed");
+    else if (ret == -1) {
+      perror("Socket read failed");
+      cmd = "quit";
+    }
     if(testing) cout << "Client " << tid << ": " << line << endl; //delete later
     
     if (cmd == "quit")
       connected = 0;
     else if (cmd == "shutdown") {
-      shutdown = 1;
+      serving = 0;
       connected = 0;
     } else if (cmd == "get") {
+    
+      string terminationMessage = "MSG " + tid;
+      snd(sock, terminationMessage.c_str());
       //set a task number in the array
       int taskNum = -1;
       while (taskNum == -1) { //loop in case taskList is full
@@ -92,6 +95,9 @@ int handleClient(int sock, int tid) {
         taskList[taskNum][0] = 0; //clear task from list
       }
     } else if (cmd == "put") {
+    
+      string terminationMessage = "MSG " + tid;
+      snd(sock, terminationMessage.c_str());
       //set a task number in the array
       int taskNum = -1;
       while (taskNum == -1) { //loop in case taskList is full
@@ -103,9 +109,10 @@ int handleClient(int sock, int tid) {
         }
         cout << "Task list full!\n";
         sleep(1);
-        cout << "a" << endl;
       }
-      cout << "b" << endl;
+      
+      //use temporary name while downloading so original file is
+      //preserved in case command is terminated
       string tmpNum = to_string(distribution(generator));
       string tempName = arg + "-tmp" + tmpNum;
       cout << tempName << endl;
@@ -124,9 +131,9 @@ int handleClient(int sock, int tid) {
         fwrite(putBuf, 1, rec_len, file);
         i++;
         if (i % 100 == 0)
-          cout << "Written " << i << " kilobytes.\n";
+          if(testing) cout << "Written " << i << " kilobytes.\n";
       }
-      cout << "Write done.\n";
+      if(testing) cout << "Write done.\n";
       filesystem::rename(tempName, arg);
       fclose(file);
       taskList[taskNum][0] = 0; //clear task from list
@@ -135,9 +142,9 @@ int handleClient(int sock, int tid) {
         if (filesystem::remove(arg))
           snd(sock, "MSG File successfully deleted");
         else {
-          string error = "ERR File '";
-          error.append(arg).append("' not found");
-          snd(sock, error.c_str());
+          string err_msg = "ERR File '";
+          err_msg.append(arg).append("' not found");
+          snd(sock, err_msg.c_str());
         }
       } catch (const std::exception &e) {
         char err_msg[1024];
@@ -191,8 +198,7 @@ int handleClient(int sock, int tid) {
     
   }
   
-  close(sock);
-  return shutdown;
+  fullClose(sock);
 }
 
 void termFunc(int termSock, int portNo) {
@@ -219,13 +225,16 @@ void termFunc(int termSock, int portNo) {
       int taskNum = atoi(buffer);
       
       cout << "Terminating task " << taskNum << endl;
+      int taskFound = 0;
       for (int i = 0; i < 100; i++) {
         if (taskList[i][0] == taskNum) { //task to be terminated found
           taskList[i][1] = 1;
-          continue;
+          taskFound = 1;
+          break;
         }
       }
-      cout << "Task could not be found.\n";
+      if (!taskFound)
+        cout << "Task could not be found.\n";
       fullClose(terminator);
     }
   }
@@ -253,19 +262,34 @@ int main (int argc, char * argv[]) {
   int tid = 1;
   while (serving) {
     listen(servSock, 5);
-  
-    int clientSock = accept(servSock, nullptr, nullptr);
-    if (clientSock == -1) 
-      cout << "Client connection failed";
-    else {
-      serving = !handleClient(clientSock, tid);
-      tid++;
+    
+    fd_set set;
+    FD_ZERO(&set);
+    FD_SET(servSock, &set);
+    FD_SET(0, &set);
+    
+    select(servSock+1, &set, NULL, NULL, NULL);
+    if(FD_ISSET(STDIN_FILENO, &set)){
+      string input;
+      getline(cin,input);
+      if (input == "shutdown")
+        serving = 0;
+      cout<<"\nServer shutting down.\n";
+    } else if(FD_ISSET(servSock, &set)) {
+      int clientSock = accept(servSock, nullptr, nullptr);
+      if (clientSock == -1) 
+        cout << "Client connection failed";
+      else {
+        handleClient(clientSock, tid);
+        tid++;
+      }
     }
   }
   
   fullClose(servSock);
   fullClose(termSock);
   termThread.join();
+  
   
   exit(1);
 
