@@ -3,6 +3,7 @@
 #include <string>
 #include <cstring>
 
+#include <sys/file.h>
 #include <filesystem>
 #include <random>
 
@@ -81,7 +82,8 @@ void handleClient(int sock, int tid) {
         char getBuf[1024] = {0};
         
         size_t rec_len = -1;
-        
+        int fd = fileno(file);
+        flock(fd, LOCK_SH);
         while((rec_len = fread(getBuf, 1, 1024, file)) > 0) {
           send(sock, getBuf, rec_len, 0);
           if (taskList[taskNum][1] == 1) { //operation terminated
@@ -122,6 +124,8 @@ void handleClient(int sock, int tid) {
         
       size_t rec_len = -1;
       int i = 0;
+      int fd = fileno(file);
+      flock(fd, LOCK_EX);
       while((rec_len = recv(sock, putBuf, sizeof(putBuf), 0)) > 0) {
         if (rec_len == 1 && putBuf[0] == '$')
           break;
@@ -258,6 +262,7 @@ int main (int argc, char * argv[]) {
   
   int termSock = socket(AF_INET, SOCK_STREAM, 0);
   thread termThread(termFunc, termSock, termPort);
+  vector<thread> handlers;
   
   int tid = 1;
   while (serving) {
@@ -280,7 +285,7 @@ int main (int argc, char * argv[]) {
       if (clientSock == -1) 
         cout << "Client connection failed";
       else {
-        handleClient(clientSock, tid);
+        handlers.emplace_back(handleClient, clientSock, tid);
         tid++;
       }
     }
@@ -289,6 +294,11 @@ int main (int argc, char * argv[]) {
   fullClose(servSock);
   fullClose(termSock);
   termThread.join();
+  for (auto &&t : handlers)
+  {
+    t.join(); 
+  }
+  
   
   
   exit(1);
