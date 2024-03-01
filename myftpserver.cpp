@@ -33,16 +33,38 @@ void fullClose(int sock) {
   close(sock);
 }
 
+//clear the socket of all remaining data
+void flushSock(int sock) {
+  
+  int ret;
+  char flushBuffer[1024];
+  fd_set set;
+  struct timeval  tv;
+  tv.tv_sec = 0;
+  tv.tv_usec = 100000;
+  while (1) {
+  
+    FD_ZERO(&set);
+    FD_SET(sock, &set);
+    ret = select(sock+1, &set, NULL, NULL, &tv);
+    if (ret)
+      recv(sock, flushBuffer, sizeof(flushBuffer), 0);
+    else
+      break;
+  }
+}
+
 void handleClient(int sock, int tid) {
+  cout << "Client " << tid << " connected." << endl;
   int connected = 1;
   
-  while (connected) {
+  while (connected && serving) {
     char buffer[1024] = {0};
     int ret = recv(sock, buffer, sizeof(buffer), 0);
     stringstream msg(buffer);
     string line(buffer);
-    string cmd, arg;
-    msg >> cmd >> arg; 
+    string cmd, arg, arg2;
+    msg >> cmd >> arg >> arg2; 
     
     if (ret == 0) //client disconnected
       break;
@@ -50,7 +72,7 @@ void handleClient(int sock, int tid) {
       perror("Socket read failed");
       cmd = "quit";
     }
-    if(testing) cout << "Client " << tid << ": " << line << endl; //delete later
+    cout << "Client " << tid << ": " << line << endl;
     
     if (cmd == "quit")
       connected = 0;
@@ -59,44 +81,50 @@ void handleClient(int sock, int tid) {
       connected = 0;
     } else if (cmd == "get") {
     
-      string terminationMessage = "MSG " + tid;
-      snd(sock, terminationMessage.c_str());
+      FILE *file = fopen(arg.c_str(), "rb");
+      if(file == NULL){
+        snd(sock, "ERR File could not be found on server");
+        continue;
+      }
+      
+      //send termination code and filesize to client
+      string filesize = to_string(filesystem::file_size(arg));
+      string startGet = "MSG " + to_string(tid) + " " + filesize;
+      snd(sock, startGet.c_str());
       //set a task number in the array
       int taskNum = -1;
       while (taskNum == -1) { //loop in case taskList is full
         for (taskNum = 0; taskNum < 100; taskNum++) {
           if (taskList[taskNum][0] == 0) {
             taskList[taskNum][0] = tid;
+            taskList[taskNum][1] = 0;
             break;
           }
         }
         sleep(1);
       }
       
-      FILE *file = fopen(arg.c_str(), "rb");
       
-      if(file == NULL) {
-        snd(sock, "ERR File could not be found");
-      } else {
-        char getBuf[1024] = {0};
-        
-        size_t rec_len = -1;
-        
-        while((rec_len = fread(getBuf, 1, 1024, file)) > 0) {
-          send(sock, getBuf, rec_len, 0);
-          if (taskList[taskNum][1] == 1) { //operation terminated
-            break;
-          }
+      char getBuf[1024] = {0};
+      
+      size_t rec_len = -1;
+      
+      while((rec_len = fread(getBuf, 1, 1024, file)) > 0) {
+        if (taskList[taskNum][1] == 1) { //operation terminated
+          taskList[taskNum][1] = 0; //reset
+          break;
         }
-        sleep(1);
-        snd(sock, "$");
-        
-        fclose(file);
-        taskList[taskNum][0] = 0; //clear task from list
+        send(sock, getBuf, rec_len, 0);
       }
+      
+      recv(sock, getBuf, sizeof(getBuf), 0); //wait for acknowledgement from client
+      
+      fclose(file);
+      taskList[taskNum][0] = 0; //clear task from list
+      
     } else if (cmd == "put") {
     
-      string terminationMessage = "MSG " + tid;
+      string terminationMessage = "MSG " + to_string(tid);
       snd(sock, terminationMessage.c_str());
       //set a task number in the array
       int taskNum = -1;
@@ -104,39 +132,57 @@ void handleClient(int sock, int tid) {
         for (taskNum = 0; taskNum < 100; taskNum++) {
           if (taskList[taskNum][0] == 0) {
             taskList[taskNum][0] = tid;
+            taskList[taskNum][1] = 0;
             break;
           }
         }
-        cout << "Task list full!\n";
         sleep(1);
       }
       
       //use temporary name while downloading so original file is
       //preserved in case command is terminated
-      string tmpNum = to_string(distribution(generator));
-      string tempName = arg + "-tmp" + tmpNum;
-      cout << tempName << endl;
+      string tempNum = to_string(distribution(generator));
+      string tempName = arg + "-temp" + tempNum;
       FILE *file = fopen(tempName.c_str(), "wb");
       
       char putBuf[1024] = {0};
-        
-      size_t rec_len = -1;
+      
+      int fileSize = stoi(arg2);
+      int written = 0;
       int i = 0;
-      while((rec_len = recv(sock, putBuf, sizeof(putBuf), 0)) > 0) {
-        if (rec_len == 1 && putBuf[0] == '$')
-          break;
+      size_t rec_len = -1;
+      while (written < fileSize) {
+        rec_len = recv(sock, putBuf, sizeof(putBuf), 0);
         if (taskList[taskNum][1] == 1) { //operation terminated
+          cout << "Command terminated" << endl;
+          flushSock(sock);
+          break;
+        } else if (rec_len == 0) { //client disconnected
+          taskList[taskNum][1] = 1;
           break;
         }
         fwrite(putBuf, 1, rec_len, file);
-        i++;
-        if (i % 100 == 0)
-          if(testing) cout << "Written " << i << " kilobytes.\n";
+        written += rec_len;
+        if (testing) {
+          i++;
+          if (i % 500 == 0)
+            cout << "Written " << i << " kilobytes.\n";
+        }
       }
+      if (taskList[taskNum][1] != 1)
+        snd(sock, "MSG File upload successful");
+      else
+        snd(sock, "MSG File upload terminated");
+      if (taskList[taskNum][1] != 1)
+        filesystem::rename(tempName, arg);
+      else
+        filesystem::remove(tempName);
+      
       if(testing) cout << "Write done.\n";
-      filesystem::rename(tempName, arg);
       fclose(file);
       taskList[taskNum][0] = 0; //clear task from list
+      taskList[taskNum][1] = 0;
+      
     } else if (cmd == "delete") {
       try {
         if (filesystem::remove(arg))
@@ -222,7 +268,15 @@ void termFunc(int termSock, int portNo) {
       int size = recv(terminator, buffer, sizeof(buffer), 0); //receive data from server
       if (size < 0)
         error("Error receiving data from server");
-      int taskNum = atoi(buffer);
+      
+      char* p_end{};
+      int taskNum = strtol(buffer, &p_end, 10);
+      
+      if (taskNum == 0) {
+        cout << "Invalid termination task number" << endl;
+        fullClose(terminator);
+        continue;
+      }
       
       cout << "Terminating task " << taskNum << endl;
       int taskFound = 0;
@@ -241,6 +295,7 @@ void termFunc(int termSock, int portNo) {
 }
 
 int main (int argc, char * argv[]) {
+  if (argc < 3) error("Correct usage: ./myftpserver <port number> <terminate port number>");
   
   int port = stoi(argv[1]);
   int termPort = stoi(argv[2]);
@@ -272,9 +327,10 @@ int main (int argc, char * argv[]) {
     if(FD_ISSET(STDIN_FILENO, &set)){
       string input;
       getline(cin,input);
-      if (input == "shutdown")
+      if (input == "shutdown") {
         serving = 0;
-      cout<<"\nServer shutting down.\n";
+        cout<<"\nServer shutting down.\n";
+      }
     } else if(FD_ISSET(servSock, &set)) {
       int clientSock = accept(servSock, nullptr, nullptr);
       if (clientSock == -1) 
