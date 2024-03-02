@@ -9,8 +9,11 @@ Use 'make' to compile both files, or 'make client' and 'make server' to compile 
 client and server files respectively.
 
 Usage:
-./myftpserver <port number>
-./myftp <server address> <port number>
+./myftpserver <port number> <terminate port> [verbose = {0}]
+./myftp <server address> <port number> <terminate port>
+
+The verbose (or testing) argument for the server is optional and will cause the server 
+to output additional information when used.
 
 The port numbers must match for the client to connect. The server address can be found
 by running 'hostname -i' on the machine running the server. If the client and server
