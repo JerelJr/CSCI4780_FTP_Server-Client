@@ -15,9 +15,13 @@ client and server files respectively. The exuctables will be stored in their cor
 
 Usage:
 ```
-./myftpserver <port number>
-./myftp <server address> <port number>
+./myftpserver <port number> <terminate port> [testing]
+./myftp <server address> <port number> <terminate port>
 ```
+
+The testing argument for the server is optional and will cause the server to output 
+additional information for testing when used. The default value is 0, and the value 
+should be 1 for testing to be enabled.
 
 The port numbers must match for the client to connect. The server address can be found
 by running 'hostname -i' on the machine running the server. If the client and server
